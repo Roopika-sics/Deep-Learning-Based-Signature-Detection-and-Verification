@@ -1,0 +1,83 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparison History</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to right, #141e30, #243b55);
+            color: white;
+            text-align: center;
+        }
+        .container {
+            width: 80%;
+            margin: 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            color: black;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        img {
+            max-width: 100px;
+            border-radius: 5px;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Comparison History</h1>
+
+        <table>
+            <tr>
+                <th>Reference</th>
+                <th>Original</th>
+                <th>Similarity</th>
+                <th>Forged</th>
+                <th>Similarity</th>
+                <th>Date</th>
+            </tr>
+            {% for comparison in comparisons %}
+            <tr>
+                <td><img src="{{ comparison.reference_image.url }}" alt="Reference Signature"></td>
+                <td><img src="{{ comparison.original_image.url }}" alt="Original Signature"></td>
+                <td>{{ comparison.orig_similarity }}%</td>
+                <td><img src="{{ comparison.forged_image.url }}" alt="Forged Signature"></td>
+                <td>{{ comparison.forg_similarity }}%</td>
+                <td>{{ comparison.created_at|date:"d M Y, H:i" }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <a href="{% url 'home' %}" class="btn">Back to Home</a>
+    </div>
+</body>
+</html>

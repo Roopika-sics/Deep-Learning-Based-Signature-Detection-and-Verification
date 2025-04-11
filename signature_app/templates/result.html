@@ -1,0 +1,100 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparison Result</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to right, #141e30, #243b55);
+            margin: 0;
+        }
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 600px;
+        }
+        h1 {
+            color: #ff4000;
+            margin-bottom: 20px;
+        }
+        .images-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .image-box {
+            text-align: center;
+        }
+        .image-box img {
+            max-width: 150px;
+            max-height: 80px;
+            border-radius: 5px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .similarity {
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .match {
+            color: #28a745;
+        }
+        .no-match {
+            color: #dc3545;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 20px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Comparison Result</h1>
+
+        <div class="images-container">
+            <div class="image-box">
+                <p>Reference Signature</p>
+                <img src="{{ reference_image_url }}" alt="Reference Signature">
+            </div>
+            <div class="image-box">
+                <p>Original Signature</p>
+                <img src="{{ original_image_url }}" alt="Original Signature">
+                <p class="similarity {% if orig_similarity  >= 70 %}match{% else %}no-match{% endif %}">
+                    Similarity: {{ orig_similarity }}%
+                </p>
+            </div>
+            <div class="image-box">
+                <p>Forged Signature</p>
+                <img src="{{ forged_image_url }}" alt="Forged Signature">
+                <p class="similarity {% if forg_similarity  >= 70 %}match{% else %}no-match{% endif %}">
+                    Similarity: {{ forg_similarity }}%
+                </p>
+            </div>
+        </div>
+
+        <a href="{% url 'home' %}" class="btn">Upload More Signatures</a>
+    </div>
+</body>
+</html>

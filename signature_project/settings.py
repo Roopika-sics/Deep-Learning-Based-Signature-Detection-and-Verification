@@ -26,8 +26,14 @@ SECRET_KEY = 'django-insecure-dmwqgla1*98(6ssmhqo0_&*!6&7wq^2iq(r4=+1pi+zr31!1gq
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['localhost','0.0.0.0','python.sicsglobal.com']
+# Forcing the script name for the application 
+FORCE_SCRIPT_NAME = '/signature_detection_system'
+#CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = [
+    'https://python.sicsglobal.com',
+    'http://python.sicsglobal.com',
+]
 
 # Application definition
 
@@ -126,4 +132,3 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-

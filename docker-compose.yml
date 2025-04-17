@@ -1,0 +1,10 @@
+services:
+  django_backend:
+    build: ./
+    container_name: signature_detection_django
+    volumes:
+      - ./:/app 
+      - ./static:/app/staticfiles
+    ports:
+      - "8011:8000"
+    restart: always

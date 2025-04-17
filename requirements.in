@@ -1,0 +1,15 @@
+# Core dependencies
+Django==5.1.7
+asgiref==3.8.1
+sqlparse==0.5.3
+
+# TensorFlow ecosystem
+tensorflow==2.16.1
+keras==3.3.3
+tensorboard==2.16.2
+tensorboard-data-server==0.7.2
+
+# Numeric/scientific computing
+numpy==1.26.4  # Explicitly use numpy 1.x for TF 2.x
+h5py==3.10.0
+scikit-learn==1.4.2

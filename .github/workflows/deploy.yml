@@ -1,0 +1,194 @@
+name: Deploy Deep Learning Based Signature Detection and Verification Project
+
+on:
+  push:
+    branches:
+      - docker-setup
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: SSH into the server and prepare environment
+      - name: Prepare server environment
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            # Create target directory with proper permissions
+            sudo mkdir -p /var/www/python.sicsglobal.com/signature_detection_system
+            sudo chown -R ${{ secrets.SERVER_USERNAME }}:www-data /var/www/python.sicsglobal.com/signature_detection_system
+            sudo chmod -R 775 /var/www/python.sicsglobal.com/signature_detection_system
+
+            # Create required subdirectories with proper permissions
+            cd /var/www/python.sicsglobal.com/signature_detection_system/
+            mkdir -p media staticfiles db
+            sudo chown -R ${{ secrets.SERVER_USERNAME }}:www-data media staticfiles db
+            sudo chmod -R 775 media staticfiles db
+
+            # Create specific subdirectories that need to exist
+            mkdir -p media/signatures
+            mkdir -p staticfiles/assets staticfiles/admin staticfiles/css
+
+            # Backup important files
+            mkdir -p .temp
+            [ -f db.sqlite3 ] && mv db.sqlite3 .temp/
+            [ -d media ] && mv media/* .temp/media/ || true
+            [ -d db ] && mv db/* .temp/db/ || true
+            [ -d staticfiles ] && mv staticfiles/* .temp/staticfiles/ || true
+
+      # Step 3: Copy files to the server with proper permissions
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: "./"
+          target: "/var/www/python.sicsglobal.com/signature_detection_system"
+          strip_components: 1
+          overwrite: true
+          tar_tmp_path: /tmp
+          tar_exec: "tar"
+          rm: false  # Don't remove files before copying
+
+      # Step 4: Set permissions and deploy
+      - name: Set permissions and deploy
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            cd /var/www/python.sicsglobal.com/signature_detection_system/
+
+            # Restore preserved files
+            [ -f .temp/db.sqlite3 ] && mv .temp/db.sqlite3 .
+            [ -d .temp/media ] && mv .temp/media/* media/ || true
+            [ -d .temp/db ] && mv .temp/db/* db/ || true
+            [ -d .temp/staticfiles ] && mv .temp/staticfiles/* staticfiles/ || true
+            rm -rf .temp
+
+            # Set proper permissions
+            sudo find . -type d -exec chmod 775 {} \;
+            sudo find . -type f -exec chmod 664 {} \;
+            sudo chmod -R 775 media db staticfiles
+            sudo chown -R ${{ secrets.SERVER_USERNAME }}:www-data .
+
+            # Docker deployment
+            docker-compose down
+            docker-compose up -d --build
+
+            # Verify container is running
+            sleep 10  # Give containers time to start
+            if ! docker ps --filter "name=signature_detection_django" --format "{{.Status}}" | grep -q "Up"; then
+              echo "Web container failed to start"
+              docker logs signature_detection_django || true
+              exit 1
+            fi
+
+      # Step 5: Verify application health
+      - name: Verify application health
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            # Wait for container to be fully up
+            sleep 15
+            
+            # Check container status
+            if ! docker ps --filter "name=signature_detection_django" --format "{{.Status}}" | grep -q "Up"; then
+              echo "Container is not running"
+              docker logs signature_detection_django || true
+              exit 1
+            fi
+            
+            # Check application health
+            if ! curl -s http://localhost:8006/signature_detection_system | grep -q "Django"; then
+              echo "Application health check failed"
+              docker logs signature_detection_django || true
+              exit 1
+            fi
+            echo "Application is healthy"
+
+      # Step 6: Enhanced Rollback
+      - name: Rollback on failure
+        if: failure()
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            echo "Starting rollback procedure..."
+            
+            cd /var/www/python.sicsglobal.com/signature_detection_system/ || {
+              echo "Failed to enter deployment directory"
+              exit 1
+            }
+            
+            # Check for any existing backups
+            echo "Checking for backups..."
+            if [ -d "backup" ]; then
+              echo "Found backup directory, restoring..."
+              
+              # Stop current containers
+              docker-compose down || true
+              
+              # Restore files
+              [ -f backup/db.sqlite3 ] && mv backup/db.sqlite3 .
+              [ -d backup/media ] && mv backup/media/* media/ || true
+              [ -d backup/db ] && mv backup/db/* db/ || true
+              [ -d backup/staticfiles ] && mv backup/staticfiles/* staticfiles/ || true
+              
+              # Start previous version
+              if docker-compose up -d; then
+                echo "Rollback completed successfully from backup directory"
+                exit 0
+              else
+                echo "Failed to start containers after rollback"
+                docker logs signature_detection_django || true
+                exit 1
+              fi
+            elif [ -d ".temp" ]; then
+              echo "Found .temp directory, restoring..."
+              
+              docker-compose down || true
+              
+              [ -f .temp/db.sqlite3 ] && mv .temp/db.sqlite3 .
+              [ -d .temp/media ] && mv .temp/media/* media/ || true
+              [ -d .temp/db ] && mv .temp/db/* db/ || true
+              [ -d .temp/staticfiles ] && mv .temp/staticfiles/* staticfiles/ || true
+              
+              if docker-compose up -d; then
+                echo "Rollback completed successfully from .temp directory"
+                exit 0
+              else
+                echo "Failed to start containers after rollback"
+                docker logs signature_detection_django || true
+                exit 1
+              fi
+            else
+              echo "No backup found - cannot rollback"
+              echo "Current directory contents:"
+              ls -la
+              echo "Trying to restart current version..."
+              
+              if docker-compose up -d; then
+                echo "Successfully restarted current version"
+                exit 1  # Still mark as failed but with restarted container
+              else
+                echo "Failed to restart containers"
+                docker logs signature_detection_django || true
+                exit 1
+              fi
+            fi

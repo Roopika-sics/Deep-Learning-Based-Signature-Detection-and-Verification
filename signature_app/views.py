@@ -3,16 +3,41 @@ import tensorflow as tf
 import numpy as np
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from .models import Signature ,SignatureComparison 
+from .models import Signature, SignatureComparison 
 from tensorflow.keras.preprocessing import image
 from sklearn.metrics.pairwise import cosine_similarity
+import gdown  # For downloading from Google Drive
 
-# Load pre-trained model
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(BASE_DIR, r'C:\Users\user\Desktop\Signature_comparison\signature_project\signature_verification_model (1).h5')
-vgg_model = tf.keras.models.load_model(model_path, compile=False, safe_mode=True)
-feature_extractor = tf.keras.Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-3].output)
+# Model configuration
+MODEL_URL = 'https://drive.google.com/uc?id=1FR1CfnQTooB36HTG2x7zzp1oRRzZLbnD'
+MODEL_NAME = 'signature_verification_model.h5'
 
+def load_model():
+    """Load the model, downloading it if it doesn't exist"""
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(BASE_DIR, MODEL_NAME)
+    
+    if not os.path.exists(model_path):
+        try:
+            print("Downloading model from Google Drive...")
+            gdown.download(MODEL_URL, model_path, quiet=False)
+            print("Model downloaded successfully!")
+        except Exception as e:
+            raise Exception(f"Failed to download model: {str(e)}")
+    
+    try:
+        model = tf.keras.models.load_model(model_path, compile=False, safe_mode=True)
+        feature_extractor = tf.keras.Model(inputs=model.inputs, outputs=model.layers[-3].output)
+        return model, feature_extractor
+    except Exception as e:
+        raise Exception(f"Failed to load model: {str(e)}")
+
+# Load model when the module is imported
+try:
+    vgg_model, feature_extractor = load_model()
+except Exception as e:
+    print(f"Error loading model: {e}")
+    # You might want to handle this error more gracefully in production
 
 def preprocess_image(img_path):
     """Load and preprocess an image for feature extraction"""
@@ -22,7 +47,6 @@ def preprocess_image(img_path):
     img_array = tf.keras.applications.vgg16.preprocess_input(img_array)
     return img_array
 
-
 def verify_signatures(anchor_path, test_path, threshold=0.85):
     """Compare two signatures and return similarity score"""
     anchor_features = feature_extractor.predict(preprocess_image(anchor_path))
@@ -30,8 +54,6 @@ def verify_signatures(anchor_path, test_path, threshold=0.85):
 
     similarity = cosine_similarity(anchor_features, test_features)[0][0]
     return similarity, similarity >= threshold
-
-
 
 import uuid
 
@@ -42,9 +64,6 @@ def save_signature(image_file, prefix):
     signature.image.name = unique_name  # Set unique filename
     signature.save()
     return signature.image.path
-
-
-
 
 def home(request):
     if request.method == 'POST':
@@ -70,11 +89,9 @@ def home(request):
         orig_signature.save()
         forg_signature.save()
 
-
         ref_path = ref_signature.image.path
         orig_path = orig_signature.image.path
         forg_path = forg_signature.image.path
-
 
         orig_similarity, is_original_genuine = verify_signatures(ref_path, orig_path)
         forg_similarity, is_forged_genuine = verify_signatures(ref_path, forg_path)
@@ -84,8 +101,6 @@ def home(request):
         request.session['is_original_genuine'] = int(is_original_genuine)
         request.session['forg_similarity'] = float(round(forg_similarity * 100, 2))
         request.session['is_forged_genuine'] = int(is_forged_genuine)
-
-
 
         SignatureComparison.objects.create(
             reference_image=reference_image,
@@ -108,29 +123,6 @@ def home(request):
 
     return render(request, 'home.html')
 
-
-
-# def result(request):
-#     """Display signature verification results"""
-#     orig_similarity = request.session.get('orig_similarity', 0)
-#     is_original_genuine = bool(request.session.get('is_original_genuine', 0))
-
-#     forg_similarity = request.session.get('forg_similarity', 0)
-#     is_forged_genuine = bool(request.session.get('is_forged_genuine', 0))
-
-
-#     print(f"Original Similarity from session: {orig_similarity}")
-#     print(f"Forged Similarity from session: {forg_similarity}")
-
-#     return render(request, 'result.html', {
-#         'orig_similarity': orig_similarity,
-#         'is_original_genuine': is_original_genuine,
-#         'forg_similarity': forg_similarity,
-#         'is_forged_genuine': is_forged_genuine
-#     })
-
-from django.conf import settings
-
 def result(request):
     reference_image_url = request.session.get('reference_image_url', "")
     original_image_url = request.session.get('original_image_url', "")
@@ -139,7 +131,6 @@ def result(request):
     print("🖼 Reference Image:", reference_image_url)
     print("🖼 Original Image:", original_image_url)
     print("🖼 Forged Image:", forged_image_url)
-
 
     orig_similarity = request.session.get('orig_similarity', 0)
     forg_similarity = request.session.get('forg_similarity', 0)

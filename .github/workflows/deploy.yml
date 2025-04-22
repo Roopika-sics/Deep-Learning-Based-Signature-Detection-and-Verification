@@ -83,8 +83,8 @@ jobs:
             sudo chown -R ${{ secrets.SERVER_USERNAME }}:www-data .
 
             # Docker deployment
-            docker-compose down
-            docker-compose up -d --build
+            docker compose down
+            docker compose up -d --build
 
             # Verify container is running
             sleep 10  # Give containers time to start
@@ -142,7 +142,7 @@ jobs:
               echo "Found backup directory, restoring..."
               
               # Stop current containers
-              docker-compose down || true
+              docker compose down || true
               
               # Restore files
               [ -f backup/db.sqlite3 ] && mv backup/db.sqlite3 .
@@ -151,7 +151,7 @@ jobs:
               [ -d backup/staticfiles ] && mv backup/staticfiles/* staticfiles/ || true
               
               # Start previous version
-              if docker-compose up -d; then
+              if docker compose up -d; then
                 echo "Rollback completed successfully from backup directory"
                 exit 0
               else
@@ -169,7 +169,7 @@ jobs:
               [ -d .temp/db ] && mv .temp/db/* db/ || true
               [ -d .temp/staticfiles ] && mv .temp/staticfiles/* staticfiles/ || true
               
-              if docker-compose up -d; then
+              if docker compose up -d; then
                 echo "Rollback completed successfully from .temp directory"
                 exit 0
               else
@@ -183,7 +183,7 @@ jobs:
               ls -la
               echo "Trying to restart current version..."
               
-              if docker-compose up -d; then
+              if docker compose up -d; then
                 echo "Successfully restarted current version"
                 exit 1  # Still mark as failed but with restarted container
               else
